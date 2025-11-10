@@ -1,0 +1,12 @@
+.vscode
+*cook
+*test
+cook.dSYM
+*main
+*build
+*.VSCodeCounter
+*bla
+*bla.csv
+*.DS_Store
+*cl
+*serv
