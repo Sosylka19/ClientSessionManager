@@ -9,37 +9,11 @@ boost::recursive_mutex cs;
 boost::asio::io_context service;
 
 
-talk_to_client::talk_to_client(): socket_(service), status_(false), already_read_(0)
-{
-    // last_ping = microsec_clock::local_time();
-}
+talk_to_client::talk_to_client(): socket_(service), status_(false), already_read_(0) {}
 std::string talk_to_client::username() const 
 {
     return username_;
 }
-
-// std::string talk_to_client::create_client_card(const std::string &username)
-// {
-//     client_cards_.emplace_back(username);
-//     return "Client card for " + username + " created.";
-// }
-
-// void talk_to_client::answer_to_client()
-// {
-//     try
-//     {
-//         read_answer();
-//         process_answer();
-//     } catch (boost::system::system_error &)
-//     {
-//         stop();
-//     }
-//     if (timed_out())
-//     {
-//         stop();
-//         std::cout << "stopping " << username_ << " - no ping in time" << std::endl;
-//     }
-// }
 
 std::string talk_to_client::ping_client()
 {
@@ -59,7 +33,9 @@ std::string talk_to_client::ping_client()
 void talk_to_client::login()
 {
     read_answer();
-    std::cout << process_answer();
+    std::string status_msg = process_answer();
+    std::cout << "\r\033[K" << "\n" << status_msg << std::endl;
+    std::cout << "server>> " << std::flush;  
 }
     
 void talk_to_client::set_client_status()
@@ -72,12 +48,6 @@ ip::tcp::socket& talk_to_client::sock()
     return socket_;
 }
 
-// bool talk_to_client::timed_out() const
-// {
-//     ptime now = microsec_clock::local_time();
-//     long long time = (now - last_ping).total_milliseconds();
-//     return time > 7000; 
-// }
 
 std::string talk_to_client::stop()
 {
@@ -126,7 +96,6 @@ std::string talk_to_client::process_answer()
     if (!found_enter)
         return "Incomplete message\n";
     
-    // last_ping = microsec_clock::local_time();
     size_t pos = std::find(buff_, buff_ + already_read_, '\n') - buff_;
     std::string msg(buff_, pos);
     std::copy(buff_ + already_read_, buff_ + max_msg, buff_);
@@ -145,7 +114,6 @@ std::string talk_to_client::process_answer()
     {
         return on_username(msg);
     }
-    // else if (msg.find("ask clients") == 0) on_clients();
     else return "invalid msg " + msg + "\n";
 }
 
@@ -153,10 +121,22 @@ std::string talk_to_client::on_login(const std::string &msg)
 {
     std::istringstream is(msg);
     is >> username_ >> username_;
-    write("logging ok\n");
-    set_client_status();
+    std::string name = username_;
+    boost::recursive_mutex::scoped_lock lk(cs);
+    for (array::iterator b = clients.begin(), e = clients.end(); b!=e; ++b)
+    {
+        if ((*b)->username() == name)
+        {
+            set_client_status();
+            (*b)->socket_ = std::move(socket_);
+            (*b)->set_name(username_);
+            (*b)->set_client_status();
 
-    return username_ + " logged in\n";
+            return username_ + " logged in\n";
+        }
+    }
+    write("logging failed\n");
+    return "login failed for " + username_ + "\n";
 }
 
 std::string talk_to_client::on_username(const std::string &msg)
@@ -167,7 +147,6 @@ std::string talk_to_client::on_username(const std::string &msg)
 }
 std::string talk_to_client::on_ping(const std::string &msg)
 {   
-    // write(clients_changed_ ? "ping client_list_changed\n": "ping ok\n");
     clients_changed_ = false;
 
     std::istringstream is(msg);
@@ -196,44 +175,16 @@ void accept_thread()
     ip::tcp::acceptor acceptor(service, ip::tcp::endpoint(ip::tcp::v4(), 8001));
     while(true)
     {
-        client_ptr new_(new talk_to_client());
+        client_ptr new_ = boost::make_shared<talk_to_client>();
         acceptor.accept(new_->sock());
-        new_->login();
-
-        std::string name = new_->handshake();
-        boost::recursive_mutex::scoped_lock lk(cs);
-        for (array::iterator b = clients.begin(), e = clients.end(); b!=e; ++b)
-        {
-            if ((*b)->username() == name)
-            {
-                new_->set_name(new_->username());
-                new_->set_client_status();
-                *b = new_;
-                break;
-            }
-        }   
+        new_ -> login();
     }
 }
-
-// void handle_clients_thread()
-// {
-//     //переписать, потому что уже не клиент кидает запрос, а сервер сам дергает клиентов
-//     while (true)
-//     {
-//         boost::this_thread::sleep(millisec(1));
-//         boost::recursive_mutex::scoped_lock lk(cs);
-//         for (array::iterator b = clients.begin(), e = clients.end(); b!=e; ++b)
-//         (*b)->answer_to_client();
-        
-//         // clients.erase(std::remove_if(clients.begin(), clients.end(),
-//         // boost::bind(&talk_to_client::timed_out, _1)), clients.end());
-//     }
-// }
 
 std::string create_client(const std::string &username)
 {
     boost::recursive_mutex::scoped_lock lock(cs);
-    client_ptr new_(new talk_to_client());
+    client_ptr new_ = boost::make_shared<talk_to_client>();
     new_->set_name(username);
     clients.push_back(new_);
     return "Client card for " + username + " created\n";
@@ -277,11 +228,4 @@ std::string exit(const std::string &username)
     return "Client " + username + " not found.";
 }
 
-// int main(int argv, char* argc[])
-// {
-//     boost::thread_group threads;
-//     threads.create_thread(accept_thread);
-//     threads.create_thread(handle_clients_thread);
-//     threads.join_all();
-// }
 

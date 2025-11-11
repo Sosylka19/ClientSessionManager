@@ -37,5 +37,5 @@ cpp-remote-runner/
 └─ .gitlab-ci.yml)
    └─ ci.yml
 
-clang++ -std=c++20 -I /opt/homebrew/Cellar/boost/1.89.0/include  -L /opt/homebrew/Cellar/boost/1.89.0/lib server/main.cpp  -lboost_chrono -lboost_filesystem  -lboost_thread -o serv
+clang++ -std=c++20 -I /opt/homebrew/Cellar/boost/1.89.0/include  -L /opt/homebrew/Cellar/boost/1.89.0/lib server/server_core.cpp server/connection_card.cpp server/server_cli.cpp  -lboost_chrono -lboost_filesystem  -lboost_thread -o serv
 clang++ -Wall -std=c++20 -I /opt/homebrew/Cellar/boost/1.89.0/include  -L /opt/homebrew/Cellar/boost/1.89.0/lib client/client_core.cpp  -lboost_chrono -lboost_filesystem  -lboost_thread -o cl  

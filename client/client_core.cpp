@@ -24,12 +24,9 @@ struct talk_to_server
         read_answer();
         while(status_)
         {
-            // write_request();
             read_answer();
 
             int millisec = rand() % 2000;
-            // std::cout << username_ << " postpone ping: "
-            //     << millisec << "\n";
             boost::this_thread::sleep(boost::posix_time::millisec(millisec));
         }
     }
@@ -42,7 +39,6 @@ private:
  
     void read_answer()
     {
-        //Read requst/answer from server and process it
         already_read_ = 0;
         read(socket_, boost::asio::buffer(buff_), 
             boost::bind(&talk_to_server::read_complete, this, _1, _2));
@@ -54,8 +50,12 @@ private:
         std::string msg(buff_, already_read_);
         if (msg.find("login_check") == 0) on_handshake();
         else if (msg.find("logging ok") == 0) on_login();
+        else if (msg.find("logging failed") == 0)
+        {
+            std::cerr << "Login failed for " << username_ << std::endl;
+            status_ = false;
+        }
         else if (msg.find("ping") == 0) on_ping(msg);
-        // else if (msg.find("clients ") == 0) on_clients(msg);
         else std::cerr << "invalid_msg " << msg << std::endl;
     }
 
@@ -67,30 +67,13 @@ private:
     void on_login()
     {
         std::cout << username_ << " logged_in" << std::endl;
-        // do_ask_clients();
     }
     void on_ping(const std::string& msg)
     {
         std::cout << "ping\n";
         write("pong " + username_ + "\n");
-        // std::istringstream is(msg);
-        // std::string answer;
-        // is >> answer >> answer;
-        // std::cout << username_ << " ПИНГАНУЛ " << std::endl;
-        // if (answer == "client_list_changed")
-        //     do_ask_clients();
     }
-    // void on_clients(const std::string& msg)
-    // {
-    //     std::string clients = msg.substr(8);
-    //     std::cout << username_ << ", new clients list:" << clients << std::endl;
-    // }
 
-    // void do_ask_clients()
-    // {
-    //     write("ask clients\n");
-    //     read_answer();
-    // }
     void write(const std::string& msg)
     {
         socket_.write_some(buffer(msg));
@@ -111,7 +94,6 @@ private:
     int already_read_;
 };
 
-//сделать проверку на порт
 
 void run_client(const std::string& username, const std::string& ip, uint16_t port)
 {
