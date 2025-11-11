@@ -1,7 +1,7 @@
-#include "conncetion_card.h"
+#include "connection_card.h"
 
-ConnectionCard::ConnectionCard(const std::string& name)
-    : name_(name) {}
+uint16_t ConnectionCard::GetPort() const { return port_;}
 
+void ConnectionCard::SetPort(uint16_t port) { port_ = port; }
 
 
