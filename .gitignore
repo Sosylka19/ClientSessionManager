@@ -10,3 +10,5 @@ cook.dSYM
 *.DS_Store
 *cl
 *serv
+*test_client
+*test_server

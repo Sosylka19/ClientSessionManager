@@ -75,6 +75,7 @@ public:
     }
 };
 
+#ifdef PROD
 int main()
 {
     
@@ -85,3 +86,4 @@ int main()
     threads.join_all();
     return 0;
 }
+#endif
