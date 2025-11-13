@@ -5,6 +5,18 @@ _description_: клиент-серверное приложение, где се
 _stack:_ C++, boost::asio, Makefile
 ```
 
+### Скачивание BOOST
+```Windows```: 
+
+``` terminal
+make install_boost_win
+```
+
+```MacOS```: 
+
+``` terminal
+make install_boost_mac
+```
 
 ### Сборка бинарников сервера и клиента, запуск сервера
 

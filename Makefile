@@ -65,11 +65,21 @@ install_boost_mac:
 	@echo "Убедись, что установилась версия $(BOOST_VERSION) и путь совпадает с $(BOOST_ROOT_MAC)"
 
 install_boost_win:
-	@echo "Установка Boost 1.89.0 на Windows:"
-	@echo "  Вариант 1 (Chocolatey, если есть пакет нужной версии):"
-	@echo "    choco install boost-msvc-14.3 --version=$(BOOST_VERSION)"
-	@echo "  Вариант 2 (vcpkg с привязкой к версии 1.89.0 в baseline):"
-	@echo "    vcpkg install \"boost[chrono,filesystem,thread]\":x64-windows"
-	@echo ""
-	@echo "После установки выставь переменные BOOST_ROOT_WIN, BOOST_INC, BOOST_LIB."
-	@echo "Сейчас BOOST_ROOT_WIN по умолчанию: $(BOOST_ROOT_WIN)"
+	@echo "== Установка Boost $(BOOST_VERSION) через vcpkg =="
+	@if not exist vcpkg ( \
+		echo "Скачиваю vcpkg..." && \
+		git clone https://github.com/microsoft/vcpkg.git && \
+		cd vcpkg && bootstrap-vcpkg.bat \
+	)
+	@echo "Устанавливаю Boost $(BOOST_VERSION)..."
+	@vcpkg\vcpkg install boost:x64-windows --recurse
+	@vcpkg\vcpkg install boost-filesystem:x64-windows
+	@vcpkg\vcpkg install boost-thread:x64-windows
+	@vcpkg\vcpkg install boost-chrono:x64-windows
+	@echo "Boost установлен!"
+	@echo "Устанавливаю пути BOOST_INC и BOOST_LIB"
+	@setx BOOST_INC_WIN "vcpkg\installed\x64-windows\include"
+	@setx BOOST_LIB_WIN "vcpkg\installed\x64-windows\lib"
+	@echo "BOOST_INC_WIN=vcpkg\\installed\\x64-windows\\include"
+	@echo "BOOST_LIB_WIN=vcpkg\\installed\\x64-windows\\lib"
+	@echo "Готово: теперь можно выполнять make all"
