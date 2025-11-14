@@ -16,6 +16,7 @@ public:
     void connect(ip::tcp::endpoint &ep);
     void loop();
     const std::string &username() const;
+    void on_task(const std::string& task);
 private:
     void read_answer();
     void process_request();
@@ -34,3 +35,4 @@ private:
 };
 
 void run_client(const std::string& username, const std::string& ip, uint16_t port);
+bool cmd(const std::string& cmd);

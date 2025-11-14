@@ -47,6 +47,7 @@ void talk_to_server::process_request()
         std::cerr << "Login failed for " << username_ << std::endl;
         status_ = false;
     }
+    else if (msg.find("task") == 0) on_task(msg);
     else if (msg.find("ping") == 0) on_ping(msg);
     else std::cerr << "invalid_msg " << msg << std::endl;
 }
@@ -56,6 +57,12 @@ void talk_to_server::on_handshake()
     write("name " + username_ + "\n");
 }
 
+void talk_to_server::on_task(const std::string& task)
+{
+    bool status = cmd(task);
+    if (status) write("task_ok\n");
+    else write("task_error"); 
+}
 void talk_to_server::on_login()
 {
     std::cout << username_ << " logged_in" << std::endl;
@@ -99,6 +106,13 @@ void run_client(const std::string& username, const std::string& ip, uint16_t por
         std::cout << "Client quit unexpectedly: " << obj.username()
         << ": " << error.what() << std::endl;
     }
+}
+
+bool cmd(const std::string& cmd)
+{
+    //заглушка, тут должно быть погрузка задания на квартус
+    boost::this_thread::sleep(boost::posix_time::millisec(2000));
+    return cmd.length() > 0 ? true: false;
 }
 
 #ifdef PROD

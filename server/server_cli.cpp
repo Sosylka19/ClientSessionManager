@@ -3,6 +3,8 @@
 
 #include "server_core.h"
 
+extern std::queue<std::string> tasks_pull;
+int interval = set_sec_timeout();
 
 class ServerCLI
 {
@@ -10,14 +12,18 @@ public:
     ServerCLI() {}
     void print_help()
     {
-        std::cout << 
+        std::cout <<
         "Usage:\n"
-        " --help              - Show this help message\n"
-        " new <client_ip>     - Create a new client\n"
-        " ping <client_ip>    - Ping a client to check if it's alive\n"
-        " list                - List all clients\n"
-        " exit <client_ip>    - Exit the CLI\n";
+        " --help                    - Show this help message\n"
+        " new <client>              - Create a new client\n"
+        " ping <client>             - Ping a client to check if it's alive\n"
+        " list                      - List all clients\n"
+        " load_tasks <file>         - Load task pool from text file\n"
+        " tasks                     - Show current task pool\n"
+        " run_task                  - Dispatch one task to an active client\n"
+        " exit <client>             - Disconnect client\n";
     }
+
 
     void creating_client(const std::string &username)
     {
@@ -40,6 +46,28 @@ public:
     {
         std::cout << "Try to exit...\n";
         std::cout << exit(username) << std::endl;
+    }
+
+    void show_tasks()
+    {
+        std::cout << "Current task pool:\n";
+        std::cout << list_tasks_pull();
+    }
+
+    void run_one_task()
+    {
+        std::string res = dispatch_task_to_active_client();
+
+        if (res == "ok")
+            std::cout << "Task executed successfully\n";
+        else if (res == "error")
+            std::cout << "Task failed, returned to pool\n";
+        else if (res == "no_tasks")
+            std::cout << "No tasks in pool\n";
+        else if (res == "no_active_clients")
+            std::cout << "No active clients available for tasks\n";
+        else
+            std::cout << "Unexpected dispatch result: " << res << "\n";
     }
 
     void run_cli()
@@ -69,6 +97,23 @@ public:
                 std::string str = command.substr(5, command.length() - 1);
                 client_exit(str);
             }
+            else if (command.find("load_tasks") == 0)
+            {
+                std::string path = command.substr(11);
+                size_t before = tasks_pull.size();
+                load_tasks(path);
+                size_t after = tasks_pull.size();
+                std::cout << "Loaded " << (after - before)
+                        << " tasks from: " << path << std::endl;
+            }
+            else if (command == "tasks")
+            {
+                show_tasks();
+            }
+            else if (command == "run_task")
+            {
+                run_one_task();
+            }
             else std::cerr << "Invalid command: " << command
                 << "\n";
         }
@@ -78,12 +123,15 @@ public:
 #ifdef PROD
 int main()
 {
-    
+    initialize_registry("data/clients.txt");
     ServerCLI interface;
     boost::thread_group threads;
     threads.create_thread(accept_thread); 
+    threads.create_thread([&]{ ping_loop(interval);});
     threads.create_thread([&]{interface.run_cli();});
     threads.join_all();
+
+    save_clients("data/clients.txt");
     return 0;
 }
 #endif

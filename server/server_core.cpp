@@ -8,8 +8,15 @@ array clients;
 boost::recursive_mutex cs;
 boost::asio::io_context service;
 
+std::queue<std::string> tasks_pull;
+
+
+
 
 talk_to_client::talk_to_client(): socket_(service), status_(false), already_read_(0) {}
+
+talk_to_client::talk_to_client(const std::string& username):socket_(service),status_(false), already_read_(0),username_(username) {}
+
 std::string talk_to_client::username() const 
 {
     return username_;
@@ -17,8 +24,6 @@ std::string talk_to_client::username() const
 
 std::string talk_to_client::ping_client()
 {
-
-    //пока единственная команда
     try
     {
         write("ping\n");
@@ -28,6 +33,26 @@ std::string talk_to_client::ping_client()
     }
     read_answer();
     return process_answer();
+}
+
+bool talk_to_client::execute_task(const std::string& task)
+{
+    try
+    {
+        write("task " + task + "\n");
+        read_answer();
+        std::string reply = process_answer();
+        if (reply.rfind("task_ok", 0) == 0)
+            return true;
+        if (reply.rfind("task_error", 0) == 0)
+            return false;
+
+        return false;
+    }
+    catch (const boost::system::system_error&)
+    {
+        return false;
+    }
 }
 
 void talk_to_client::login()
@@ -114,6 +139,8 @@ std::string talk_to_client::process_answer()
     {
         return on_username(msg);
     }
+    else if (msg.find("task_ok") == 0) return "task_ok";
+    else if (msg.find("task_error") == 0) return "task_error";
     else return "invalid msg " + msg + "\n";
 }
 
@@ -135,8 +162,11 @@ std::string talk_to_client::on_login(const std::string &msg)
             return username_ + " logged in\n";
         }
     }
-    write("logging failed\n");
-    return "login failed for " + username_ + "\n";
+    set_client_status();
+    clients.push_back(shared_from_this());
+    return username_ + " logged in\n";
+    // write("logging failed\n");
+    // return "login failed for " + username_ + "\n";
 }
 
 std::string talk_to_client::on_username(const std::string &msg)
@@ -184,6 +214,8 @@ void accept_thread()
         client_ptr new_ = boost::make_shared<talk_to_client>();
         acceptor.accept(new_->sock());
         new_ -> login();
+
+        // clients.erase(std::remove_if())
     }
 }
 
@@ -233,5 +265,168 @@ std::string exit(const std::string &username)
     }
     return "Client " + username + " not found.";
 }
+
+void initialize_registry(const std::string& path)
+{
+    std::ifstream input_file(path);
+    if (input_file.is_open())
+    {
+        std::string line;
+        while (std::getline(input_file, line))
+        {
+            int flag = 0;
+            for (auto b = clients.begin(); b != clients.end(); ++b)
+            {   
+                if ((*b)->username() == line)
+                {
+                    flag = 1;
+                    break;
+                }
+            }
+
+            if (!flag)
+            {
+                clients.push_back(boost::make_shared<talk_to_client>(line));
+            }
+        }
+        input_file.close();
+    }
+}
+
+void save_clients(const std::string& path)
+{
+    std::ofstream output_file;
+    output_file.open(path);
+    if (output_file.is_open())
+    {
+        for (auto i = clients.begin(); i != clients.end(); ++i)
+        {
+            output_file << (*i)->username() << "\n";
+        }
+    }
+    else
+    {
+        std::cerr << "error in file path" << std::endl;
+    }
+    output_file.close();
+}
+
+void load_tasks(const std::string& path)
+{
+    std::ifstream input_file(path);
+    if (input_file.is_open())
+    {
+        std::string line;
+        while(getline(input_file, line))
+        {
+            tasks_pull.push(line);
+        }
+        input_file.close();
+    }
+}
+
+int set_sec_timeout()
+{
+    std::ifstream config("../data/ping_timeout.txt");
+    if (!config.is_open())
+        return 5;  
+
+    int sec = 5;  
+    config >> sec;
+
+    if (!config.good())  
+        return 5; 
+
+    return sec;
+}
+
+std::string dispatch_task_to_active_client()
+{
+    boost::recursive_mutex::scoped_lock lock(cs);
+    if (tasks_pull.empty())
+        return "no_tasks";
+    std::string task = tasks_pull.front();
+    tasks_pull.pop();
+    for (auto& c : clients)
+    {
+        if (!c->get_status())
+            continue;
+
+        lock.unlock();
+        bool ok = c->execute_task(task);
+        lock.lock();
+
+        if (ok)
+        {
+            return "ok";
+        }
+        else
+        {
+            tasks_pull.push(task);
+            return "error";
+        }
+    }
+
+    tasks_pull.push(task);
+    return "no_active_clients";
+}
+
+std::string list_tasks_pull()
+{
+    boost::recursive_mutex::scoped_lock lock(cs);
+
+    if (tasks_pull.empty())
+        return "Task pool is empty\n";
+
+    std::queue<std::string> tmp = tasks_pull;
+    std::ostringstream os;
+    size_t idx = 0;
+
+    while (!tmp.empty())
+    {
+        os << idx++ << ": " << tmp.front() << '\n';
+        tmp.pop();
+    }
+
+    return os.str();
+}
+
+void ping_loop(int interval_sec)
+{
+    while (true)
+    {
+        boost::this_thread::sleep(boost::posix_time::seconds(interval_sec));
+        std::vector<client_ptr> active_copy;
+
+        {
+            boost::recursive_mutex::scoped_lock lock(cs);
+            for (auto& c : clients)
+            {
+                if (c->get_status())
+                    active_copy.push_back(c);
+            }
+        }
+        for (auto& c : active_copy)
+        {
+            try
+            {
+                std::string response = c->ping_client();
+                if (response.find("pong") == std::string::npos)
+                {
+                    std::cerr << "[PING] Client " << c->username() 
+                              << " returned unexpected: " << response << "\n";
+                }
+            }
+            catch (std::exception& e)
+            {
+                std::cerr << "[PING] Client " << c->username() 
+                          << " failed: " << e.what() << "\n";
+
+                c->stop();
+            }
+        }
+    }
+}
+
 
 

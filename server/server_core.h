@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <fstream>
 
 #include <boost/asio.hpp>
 #include <boost/bind/bind.hpp>
@@ -18,11 +19,13 @@ struct talk_to_client: boost::enable_shared_from_this<talk_to_client>, public Co
 {
     //дописать явный интерфейс по моим методам с кли
     talk_to_client();
+    talk_to_client(const std::string& username);
 
     std::string username() const;
 
     // void answer_to_client();
     std::string ping_client();
+    bool execute_task(const std::string& command);
     void set_client_status();
     ip::tcp::socket& sock();
     std::string stop();
@@ -51,8 +54,15 @@ private:
 };
 
 void accept_thread();
-void handle_clients_thread();
+// void handle_clients_thread();
 std::string ping_client(const std::string& username);
 std::string list_clients();
 std::string exit(const std::string& username);
 std::string create_client(const std::string& username);
+void initialize_registry(const std::string& path);
+void save_clients(const std::string& path);
+int set_sec_timeout();
+void load_tasks(const std::string& path);
+std::string dispatch_task_to_active_client();
+std::string list_tasks_pull();
+void ping_loop(int interval_sec);
