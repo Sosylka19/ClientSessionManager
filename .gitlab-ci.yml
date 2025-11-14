@@ -4,6 +4,7 @@ stages:
 test_job:
   stage: test
   tags:
-    - local      # тот же тег, что у раннера
+    - local
   script:
-    - make && make test
+    - arch -arm64 make CXX=clang++
+    - arch -arm64 make test CXX=clang++
