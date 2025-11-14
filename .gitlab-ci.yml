@@ -13,6 +13,8 @@ before_script:
 
 build:
   stage: build
+  tags:
+    - local
   script:
     - make
   artifacts:
