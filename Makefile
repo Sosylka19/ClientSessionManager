@@ -17,6 +17,9 @@ UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
     BOOST_INC_DEFAULT = $(BOOST_INC_MAC)
     BOOST_LIB_DEFAULT = $(BOOST_LIB_MAC)
+else ifeq ($(UNAME_S),Linux)
+    BOOST_INC_DEFAULT =
+    BOOST_LIB_DEFAULT =
 else
     BOOST_INC_DEFAULT = $(BOOST_INC_WIN)
     BOOST_LIB_DEFAULT = $(BOOST_LIB_WIN)
@@ -38,13 +41,15 @@ TEST_SERVER_SRC = tests/test_server.cpp
 .PHONY: all test clean install_boost_mac install_boost_win
 
 all: serv cl
-	./serv
 
 serv: $(SERVER_SRC) $(CLIENT_SRC)
 	$(CXX) $(CXXFLAGS) -DPROD $(SERVER_SRC) $(LDFLAGS) -o $@
 
 cl: $(CLIENT_SRC)
 	$(CXX) $(CXXFLAGS) -DPROD $(CLIENT_SRC) $(LDFLAGS) -o $@
+
+launch: 
+	./serv
 
 test: test_client test_server
 

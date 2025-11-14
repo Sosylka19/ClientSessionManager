@@ -30,6 +30,7 @@ struct talk_to_client: boost::enable_shared_from_this<talk_to_client>, public Co
     std::string handshake();
     void set_name(const std::string &name);
     bool get_status() const;
+    bool operator==(const talk_to_client& obj);
     // bool timed_out() const;
 private:
     void read_answer();

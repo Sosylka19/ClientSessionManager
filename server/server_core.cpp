@@ -169,6 +169,12 @@ bool talk_to_client::get_status() const
     return status_;
 }
 
+bool talk_to_client::operator==(const talk_to_client& obj)
+{
+    if ( obj.username() == username_) return true;
+    return false;
+}
+
 
 void accept_thread()
 {
